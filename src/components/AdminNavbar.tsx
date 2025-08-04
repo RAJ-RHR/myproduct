@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -16,7 +15,7 @@ export default function AdminNavbar({ companyName, tenantSlug }: { companyName: 
   };
 
   return (
-    <nav className="bg-gray-700 text-white px-2 py-9 flex items-center justify-between shadow sticky top-0 z-50">
+    <nav className="bg-gray-700 text-white w-full px-4 py-4 flex items-center justify-between shadow sticky top-0 z-50">
       {/* Logo */}
       <div
         className="font-bold text-lg cursor-pointer"
@@ -36,20 +35,24 @@ export default function AdminNavbar({ companyName, tenantSlug }: { companyName: 
       </button>
 
       {/* Menu */}
-      <div className={`${menuOpen ? "block" : "hidden"} absolute sm:static top-14 sm:top-auto left-0 sm:left-auto bg-gray-600 sm:bg-transparent w-full sm:w-auto sm:flex sm:items-center`}>
-        <ul className="flex flex-col sm:flex-row sm:gap-6 px-4 sm:px-0">
-          <li>
+      <div
+        className={`${
+          menuOpen ? "block" : "hidden"
+        } absolute sm:static top-14 left-0 bg-gray-600 sm:bg-transparent w-full sm:w-auto sm:flex sm:items-center`}
+      >
+        <ul className="flex flex-col sm:flex-row sm:gap-8 px-6 sm:px-0 w-full sm:w-auto">
+          <li className="w-full sm:w-auto">
             <button
               onClick={() => router.push(`/admin/${tenantSlug}/manage`)}
-              className="block py-2 sm:py-0 hover:underline"
+              className="block py-2 sm:py-0 hover:underline w-full text-left"
             >
               Manage
             </button>
           </li>
-          <li>
+          <li className="w-full sm:w-auto">
             <button
               onClick={handleLogout}
-              className="block py-2 sm:py-0 hover:underline"
+              className="block py-2 sm:py-0 hover:underline w-full text-left"
             >
               Logout
             </button>
