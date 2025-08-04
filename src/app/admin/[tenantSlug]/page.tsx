@@ -228,7 +228,8 @@ export default function AdminDashboard() {
         onSubmit={handleAddOrUpdateProduct}
         className="bg-white p-4 rounded-lg shadow mb-6 space-y-3"
       >
-        <h2 className="text-lg font-bold">{editingId ? "Edit Product" : "Add Product"}</h2>
+        <h2 className="text-lg font-bold border p-2 rounded w-full bg-white text-gray-800 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+">{editingId ? "Edit Product" : "Add Product"}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input
             value={name}
@@ -425,7 +426,7 @@ export default function AdminDashboard() {
         <button
           disabled={page === 1}
           onClick={() => setPage((p) => p - 1)}
-          className="px-3 py-1 bg-gray-300 rounded disabled:opacity-50"
+          className="px-3 py-1 bg-gray-700 rounded disabled:opacity-50"
         >
           Prev
         </button>
@@ -433,7 +434,7 @@ export default function AdminDashboard() {
         <button
           disabled={page * productsPerPage >= filteredProducts.length}
           onClick={() => setPage((p) => p + 1)}
-          className="px-3 py-1 bg-gray-300 rounded disabled:opacity-50"
+          className="px-3 py-1 bg-gray-700 rounded disabled:opacity-50"
         >
           Next
         </button>

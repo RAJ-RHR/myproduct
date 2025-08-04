@@ -36,7 +36,7 @@ export default function AdminNavbar({ companyName, tenantSlug }: { companyName: 
       </button>
 
       {/* Menu */}
-      <div className={`${menuOpen ? "block" : "hidden"} absolute sm:static top-14 sm:top-auto left-0 sm:left-auto bg-blue-600 sm:bg-transparent w-full sm:w-auto sm:flex sm:items-center`}>
+      <div className={`${menuOpen ? "block" : "hidden"} absolute sm:static top-14 sm:top-auto left-0 sm:left-auto bg-gray-600 sm:bg-transparent w-full sm:w-auto sm:flex sm:items-center`}>
         <ul className="flex flex-col sm:flex-row sm:gap-6 px-4 sm:px-0">
           <li>
             <button
