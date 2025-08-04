@@ -14,6 +14,10 @@ export default function ProductDetailPage() {
   useEffect(() => {
     const fetchProduct = async () => {
       try {
+        if (typeof tenantSlug !== "string") {
+          setLoading(false);
+          return;
+        }
         const slugDoc = await getDoc(doc(db, "slugs", tenantSlug));
         if (!slugDoc.exists()) {
           setLoading(false);

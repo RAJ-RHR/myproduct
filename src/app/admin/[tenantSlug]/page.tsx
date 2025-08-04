@@ -334,7 +334,7 @@ export default function AdminDashboard() {
 
               {product.customFields?.length > 0 && (
                 <div className="mt-2">
-                  {product.customFields.map((field, idx) => (
+                  {product.customFields.map((field: { key: string; value: string }, idx: number) => (
                     <p key={idx} className="text-xs text-gray-600">
                       <strong>{field.key}:</strong> {field.value}
                     </p>
