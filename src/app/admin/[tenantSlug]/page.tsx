@@ -23,14 +23,21 @@ export default function AdminDashboard() {
   const [uid, setUid] = useState<string | null>(null);
   const [tenantSlug, setTenantSlug] = useState<string | null>(null);
   const [products, setProducts] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const productsPerPage = 20;
+
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
-  const [images, setImages] = useState<FileList | null>(null);
-  const [previewImages, setPreviewImages] = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>([]);
+  const [coverIndex, setCoverIndex] = useState(0);
   const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrValue, setQrValue] = useState("");
 
   const CLOUDINARY_UPLOAD_PRESET = "qr_product_upload";
   const CLOUDINARY_CLOUD_NAME = "deijswbt1";
@@ -44,7 +51,6 @@ export default function AdminDashboard() {
           if (tenantDoc.exists()) {
             const data = tenantDoc.data();
             setTenantSlug(data.tenantSlug);
-
             await setDoc(doc(db, "slugs", data.tenantSlug), { uid: user.uid }, { merge: true });
           }
         } catch (err) {
@@ -78,22 +84,18 @@ export default function AdminDashboard() {
   const slugify = (text: string) =>
     text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
 
-  const uploadImagesToCloudinary = async (files: FileList) => {
-    const urls: string[] = [];
-    for (const file of Array.from(files)) {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-      formData.append("folder", `${tenantSlug}/${slugify(name)}`);
+  const uploadImageToCloudinary = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    formData.append("folder", `${tenantSlug}/${slugify(name)}`);
 
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`,
-        { method: "POST", body: formData }
-      );
-      const data = await res.json();
-      urls.push(data.secure_url);
-    }
-    return urls;
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`,
+      { method: "POST", body: formData }
+    );
+    const data = await res.json();
+    return data.secure_url;
   };
 
   const handleAddOrUpdateProduct = async (e: React.FormEvent) => {
@@ -102,17 +104,12 @@ export default function AdminDashboard() {
     setLoading(true);
 
     try {
-      let imageUrls: string[] = [];
-      if (images && images.length > 0) {
-        imageUrls = await uploadImagesToCloudinary(images);
-      }
-
       const productData = {
         name,
         slug: slugify(name),
         price,
         description,
-        images: imageUrls.length > 0 ? imageUrls : previewImages,
+        images,
         customFields: customFields.filter((field) => field.key && field.value),
       };
 
@@ -137,23 +134,17 @@ export default function AdminDashboard() {
     setName(product.name);
     setPrice(product.price);
     setDescription(product.description);
-    setPreviewImages(product.images || []);
+    setImages(product.images || []);
+    setCoverIndex(0);
     setCustomFields(product.customFields || []);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDelete = async (product: any) => {
     if (!uid) return;
     if (!confirm(`Delete ${product.name}?`)) return;
-
     try {
       await deleteDoc(doc(db, "tenants", uid, "products", product.id));
-
-      await fetch(`/api/delete-folder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folder: `${tenantSlug}/${product.slug}` }),
-      });
-
       await fetchProducts();
     } catch (err) {
       console.error("Error deleting product:", err);
@@ -169,21 +160,31 @@ export default function AdminDashboard() {
     setName("");
     setPrice("");
     setDescription("");
-    setImages(null);
-    setPreviewImages([]);
+    setImages([]);
+    setCoverIndex(0);
     setCustomFields([]);
   };
 
-  const handleImagePreview = (files: FileList) => {
-    setImages(files);
-    const urls = Array.from(files).map((file) => URL.createObjectURL(file));
-    setPreviewImages(urls);
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files).slice(0, 7 - images.length);
+    for (const file of files) {
+      const url = await uploadImageToCloudinary(file);
+      setImages((prev) => [...prev, url]);
+    }
   };
 
-  const removePreviewImage = (index: number) => {
-    const newPreviews = [...previewImages];
-    newPreviews.splice(index, 1);
-    setPreviewImages(newPreviews);
+  const removeImage = (index: number) => {
+    const updated = [...images];
+    updated.splice(index, 1);
+    setImages(updated);
+  };
+
+  const reorderImages = (from: number, to: number) => {
+    const updated = [...images];
+    const [moved] = updated.splice(from, 1);
+    updated.splice(to, 0, moved);
+    setImages(updated);
   };
 
   const addCustomField = () => {
@@ -196,177 +197,255 @@ export default function AdminDashboard() {
     setCustomFields(updated);
   };
 
+  const removeCustomField = (index: number) => {
+    const updated = [...customFields];
+    updated.splice(index, 1);
+    setCustomFields(updated);
+  };
+
+  const filteredProducts = products.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  );
+  const paginatedProducts = filteredProducts.slice(
+    (page - 1) * productsPerPage,
+    page * productsPerPage
+  );
+
   return (
     <div className="p-4 sm:p-6 bg-gray-100 min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-blue-600">
-          Admin Dashboard - {tenantSlug || "Loading..."}
-        </h1>
-        <button
-          onClick={handleLogout}
-          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
-        >
-          Logout
-        </button>
+      <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
+        <h1 className="text-2xl font-bold text-blue-600">Admin Dashboard</h1>
+        <div className="flex gap-2">
+          <button
+            onClick={() => router.push(`/admin/${tenantSlug}/manager`)}
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
+          >
+            Theme Manager
+          </button>
+          <button
+            onClick={handleLogout}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Product Form */}
       <form
         onSubmit={handleAddOrUpdateProduct}
-        className="bg-white p-4 rounded-lg shadow-lg mb-8 max-w-xl mx-auto space-y-4"
+        className="bg-white p-4 rounded-lg shadow mb-6 space-y-3"
       >
-        <input
-          type="text"
-          placeholder="Product Name"
-          className="w-full p-2 border rounded"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <input
-          type="text"
-          placeholder="Price"
-          className="w-full p-2 border rounded"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          required
-        />
+        <h2 className="text-lg font-bold">{editingId ? "Edit Product" : "Add Product"}</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Product Name"
+            className="border p-2 rounded w-full"
+            required
+          />
+          <input
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="Price"
+            className="border p-2 rounded w-full"
+            required
+          />
+        </div>
         <textarea
-          placeholder="Description"
-          className="w-full p-2 border rounded"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          required
+          placeholder="Description"
+          className="border p-2 rounded w-full"
         />
-        <label className="block cursor-pointer border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50 hover:bg-gray-100">
-          <input
-            type="file"
-            multiple
-            onChange={(e) => e.target.files && handleImagePreview(e.target.files)}
-            className="hidden"
-          />
-          <span className="text-gray-500">📷 Click or Drag to Upload Images</span>
-        </label>
-        {previewImages.length > 0 && (
-          <div className="flex flex-wrap gap-3">
-            {previewImages.map((src, idx) => (
-              <div key={idx} className="relative w-20 h-20">
-                <Image
-                  src={src}
-                  alt="Preview"
-                  width={80}
-                  height={80}
-                  className="rounded object-cover w-full h-full"
-                />
+        <input
+          type="file"
+          multiple
+          onChange={handleImageUpload}
+          className="w-full"
+          accept="image/*"
+        />
+        <div className="flex gap-2 overflow-x-auto">
+          {images.map((img, i) => (
+            <div key={i} className="relative flex-shrink-0">
+              <Image
+                src={img}
+                alt={`Image ${i}`}
+                width={80}
+                height={80}
+                className={`rounded border ${i === coverIndex ? "border-green-500" : ""}`}
+              />
+              <div className="flex gap-1 absolute top-1 right-1">
                 <button
                   type="button"
-                  onClick={() => removePreviewImage(idx)}
-                  className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full px-1"
+                  className="bg-green-500 text-white text-xs px-1 rounded"
+                  onClick={() => setCoverIndex(i)}
+                >
+                  Cover
+                </button>
+                <button
+                  type="button"
+                  className="bg-red-500 text-white text-xs px-1 rounded"
+                  onClick={() => removeImage(i)}
                 >
                   ✕
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Custom Fields */}
+            </div>
+          ))}
+        </div>
         <div>
-          <h3 className="font-semibold mb-2">Custom Fields</h3>
           {customFields.map((field, idx) => (
-            <div key={idx} className="flex gap-2 mb-2">
+            <div key={idx} className="flex gap-2 mb-1">
               <input
-                type="text"
-                placeholder="Field Name"
                 value={field.key}
                 onChange={(e) => updateCustomField(idx, e.target.value, field.value)}
-                className="flex-1 p-2 border rounded"
+                placeholder="Field Name"
+                className="border p-1 flex-1"
               />
               <input
-                type="text"
-                placeholder="Field Value"
                 value={field.value}
                 onChange={(e) => updateCustomField(idx, field.key, e.target.value)}
-                className="flex-1 p-2 border rounded"
+                placeholder="Field Value"
+                className="border p-1 flex-1"
               />
+              <button
+                type="button"
+                className="bg-red-500 text-white text-xs px-2 rounded"
+                onClick={() => removeCustomField(idx)}
+              >
+                ✕
+              </button>
             </div>
           ))}
           <button
             type="button"
+            className="bg-blue-500 text-white text-xs px-2 py-1 rounded"
             onClick={addCustomField}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
           >
             + Add Field
           </button>
         </div>
-
         <button
           type="submit"
-          disabled={loading || !uid}
-          className={`w-full py-2 rounded text-white ${
-            loading || !uid ? "bg-gray-400" : "bg-green-500 hover:bg-green-600"
-          }`}
+          disabled={loading}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full sm:w-auto"
         >
-          {editingId ? "Update Product" : "Add Product"}
+          {loading ? "Saving..." : editingId ? "Update Product" : "Add Product"}
         </button>
       </form>
 
+      {/* Search */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="🔍 Search products..."
+          className="w-full sm:w-1/3 p-2 border rounded shadow-sm"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+        />
+      </div>
+
       {/* Product List */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {products.map((product) => {
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {paginatedProducts.map((product) => {
           const productUrl = `${window.location.origin}/${tenantSlug}/product/${product.slug}`;
           return (
             <div
               key={product.id}
-              className="bg-white p-4 rounded-lg shadow-lg flex flex-col"
+              className="bg-white rounded-lg shadow hover:shadow-lg transition p-2 flex flex-col items-center text-center"
             >
-              {product.images?.length > 0 && (
+              {product.images?.[0] && (
                 <img
                   src={product.images[0]}
                   alt={product.name}
-                  className="w-full h-40 object-cover rounded mb-2"
+                  className="w-full h-28 object-cover rounded mb-1"
                 />
               )}
-              <h2 className="font-bold text-lg">{product.name}</h2>
-              <p className="text-blue-600 font-semibold">₹{product.price}</p>
-              <p className="text-gray-500 text-sm flex-1">{product.description}</p>
-
-              {product.customFields?.length > 0 && (
-                <div className="mt-2">
-                  {product.customFields.map((field: { key: string; value: string }, idx: number) => (
-                    <p key={idx} className="text-xs text-gray-600">
-                      <strong>{field.key}:</strong> {field.value}
-                    </p>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <QRCodeCanvas id={`qr-${product.id}`} value={productUrl} size={100} />
+              <p className="font-semibold text-sm truncate">{product.name}</p>
+              <div className="mt-2 flex flex-wrap gap-1 justify-center">
+                <button
+                  onClick={() => {
+                    setQrValue(productUrl);
+                    setQrModalOpen(true);
+                  }}
+                  className="bg-purple-500 text-white px-2 py-1 rounded text-xs"
+                >
+                  QR
+                </button>
                 <button
                   onClick={() => router.push(`/${tenantSlug}/product/${product.slug}`)}
-                  className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded"
+                  className="bg-blue-500 text-white px-2 py-1 rounded text-xs"
                 >
                   View
                 </button>
                 <button
                   onClick={() => handleEdit(product)}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded"
+                  className="bg-yellow-500 text-white px-2 py-1 rounded text-xs"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => handleDelete(product)}
-                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded"
+                  className="bg-red-500 text-white px-2 py-1 rounded text-xs"
                 >
-                  Delete
+                  Del
                 </button>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Pagination */}
+      <div className="flex justify-center items-center mt-6 gap-3">
+        <button
+          disabled={page === 1}
+          onClick={() => setPage((p) => p - 1)}
+          className="px-3 py-1 bg-gray-300 rounded disabled:opacity-50"
+        >
+          Prev
+        </button>
+        <span>Page {page}</span>
+        <button
+          disabled={page * productsPerPage >= filteredProducts.length}
+          onClick={() => setPage((p) => p + 1)}
+          className="px-3 py-1 bg-gray-300 rounded disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+
+      {/* QR Modal */}
+      {qrModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white p-4 rounded shadow relative">
+            <QRCodeCanvas value={qrValue} size={200} />
+            <div className="flex gap-2 mt-3 justify-center">
+              <a
+                href={`data:image/svg+xml;utf8,${encodeURIComponent(
+                  `<svg xmlns="http://www.w3.org/2000/svg">${qrValue}</svg>`
+                )}`}
+                download="qrcode.png"
+                className="bg-green-500 text-white px-4 py-1 rounded"
+              >
+                Download
+              </a>
+              <button
+                onClick={() => setQrModalOpen(false)}
+                className="bg-red-500 text-white px-4 py-1 rounded"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
