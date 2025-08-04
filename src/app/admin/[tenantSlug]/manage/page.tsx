@@ -5,245 +5,198 @@ import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
-export default function ThemeManager() {
-  const defaultTheme = {
-    background: "#ffffff",
-    primaryColor: "#1e40af",
-    secondaryColor: "#9333ea",
-    fontColor: "#000000", // 🔹 New Font Color
-    fontFamily: "Inter",
-    contentBackground: "#ffffff",
-    fontSizeHeading: "24px",
-    fontSizeDescription: "16px",
-    fontSizeButton: "14px",
-  };
+const defaultTheme: Record<string, string> = {
+  background: "#ffffff",
+  contentBackground: "#ffffff",
+  primaryColor: "#1e40af",
+  secondaryColor: "#9333ea",
+  fontColor: "#000000",
+  fontFamily: "Inter",
+  fontSizeHeading: "24px",
+  fontSizeDescription: "16px",
+  fontSizeButton: "14px",
+  borderRadius: "8px",
+  borderColor: "#cccccc",
+  borderWidth: "1px",
+  padding: "16px",
+  margin: "10px",
+  boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+  opacity: "1",
+  fontWeight: "400",
+};
 
+// Auto options for select fields
+const selectOptions: Record<string, string[]> = {
+  fontFamily: ["Inter", "Poppins", "Roboto", "Montserrat"],
+  fontWeight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+};
+
+// Auto field type detection
+function detectFieldType(key: string, value: string) {
+  if (value.startsWith("#") && value.length <= 7) return "color";
+  if (value.includes("rgba") || value.includes("rgb")) return "color";
+  if (value.endsWith("px") || value.endsWith("rem") || value.endsWith("em") || value.endsWith("%"))
+    return "size";
+  if (!isNaN(Number(value)) && key.toLowerCase().includes("opacity")) return "range";
+  if (!isNaN(Number(value)) && key.toLowerCase().includes("weight")) return "select";
+  if (selectOptions[key]) return "select";
+  if (value.includes("shadow")) return "text"; // Freeform shadow
+  return "text";
+}
+
+export default function ThemeManager() {
   const [uid, setUid] = useState<string | null>(null);
-  const [theme, setTheme] = useState<any>(defaultTheme);
-  const [previewTheme, setPreviewTheme] = useState<any>(defaultTheme);
+  const [theme, setTheme] = useState<Record<string, string>>(defaultTheme);
+  const [previewTheme, setPreviewTheme] = useState<Record<string, string>>(defaultTheme);
   const [saving, setSaving] = useState(false);
 
-  // Authentication & Fetch Theme
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUid(user.uid);
-        const docRef = doc(db, "tenants", user.uid, "settings", "theme");
-        const snap = await getDoc(docRef);
+        const themeRef = doc(db, "tenants", user.uid, "settings", "theme");
+        const snap = await getDoc(themeRef);
         if (snap.exists()) {
           const loadedTheme = { ...defaultTheme, ...snap.data() };
           setTheme(loadedTheme);
           setPreviewTheme(loadedTheme);
+        } else {
+          await setDoc(themeRef, defaultTheme);
         }
       }
     });
     return () => unsub();
   }, []);
 
-  // Save Theme
   const saveTheme = async () => {
     if (!uid) return;
     setSaving(true);
-    const docRef = doc(db, "tenants", uid, "settings", "theme");
-    await setDoc(docRef, theme);
+    await setDoc(doc(db, "tenants", uid, "settings", "theme"), theme);
     setSaving(false);
     alert("Theme Saved ✅");
   };
 
+  const handleChange = (key: string, value: string) => {
+    setTheme((prev) => ({ ...prev, [key]: value }));
+    setPreviewTheme((prev) => ({ ...prev, [key]: value }));
+  };
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-gray-100">
-      {/* Left Controls */}
-      <div className="lg:w-1/3 p-5 bg-white shadow-lg">
+      {/* Controls */}
+      <div className="lg:w-1/3 p-5 bg-white shadow-lg overflow-y-auto">
         <h2 className="text-2xl font-bold mb-5 text-gray-800">Theme Manager</h2>
 
-        {/* Background */}
-        <label className="block mb-4">
-          <span className="block mb-1 font-semibold text-gray-700">Background</span>
-          <input
-            type="color"
-            value={theme.background}
-            onChange={(e) => {
-              const val = e.target.value;
-              setTheme({ ...theme, background: val });
-              setPreviewTheme({ ...previewTheme, background: val });
-            }}
-            className="w-full h-10 cursor-pointer border rounded"
-          />
-        </label>
+        {Object.entries(theme).map(([key, value]) => {
+          const type = detectFieldType(key, value);
 
-        {/* Content Background */}
-        <label className="block mb-4">
-          <span className="block mb-1 font-semibold text-gray-700">Content Background</span>
-          <input
-            type="color"
-            value={theme.contentBackground}
-            onChange={(e) => {
-              const val = e.target.value;
-              setTheme({ ...theme, contentBackground: val });
-              setPreviewTheme({ ...previewTheme, contentBackground: val });
-            }}
-            className="w-full h-10 cursor-pointer border rounded"
-          />
-        </label>
+          return (
+            <label key={key} className="block mb-4">
+              <span className="block mb-1 font-semibold text-gray-700 capitalize">
+                {key.replace(/([A-Z])/g, " $1")}
+              </span>
 
-        {/* Primary Color */}
-        <label className="block mb-4">
-          <span className="block mb-1 font-semibold text-gray-700">Primary Color</span>
-          <input
-            type="color"
-            value={theme.primaryColor}
-            onChange={(e) => {
-              const val = e.target.value;
-              setTheme({ ...theme, primaryColor: val });
-              setPreviewTheme({ ...previewTheme, primaryColor: val });
-            }}
-            className="w-full h-10 cursor-pointer border rounded"
-          />
-        </label>
+              {type === "color" && (
+                <input
+                  type="color"
+                  value={value}
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  className="w-full h-10 cursor-pointer border rounded"
+                />
+              )}
 
-        {/* Secondary Color */}
-        <label className="block mb-4">
-          <span className="block mb-1 font-semibold text-gray-700">Secondary Color</span>
-          <input
-            type="color"
-            value={theme.secondaryColor}
-            onChange={(e) => {
-              const val = e.target.value;
-              setTheme({ ...theme, secondaryColor: val });
-              setPreviewTheme({ ...previewTheme, secondaryColor: val });
-            }}
-            className="w-full h-10 cursor-pointer border rounded"
-          />
-        </label>
+              {type === "size" && (
+                <input
+                  type="number"
+                  value={parseInt(value)}
+                  onChange={(e) => handleChange(key, `${e.target.value}px`)}
+                  className="w-full p-2 border rounded"
+                />
+              )}
 
-        {/* 🔹 Font Color */}
-        <label className="block mb-4">
-          <span className="block mb-1 font-semibold text-gray-700">Font Color</span>
-          <input
-            type="color"
-            value={theme.fontColor}
-            onChange={(e) => {
-              const val = e.target.value;
-              setTheme({ ...theme, fontColor: val });
-              setPreviewTheme({ ...previewTheme, fontColor: val });
-            }}
-            className="w-full h-10 cursor-pointer border rounded"
-          />
-        </label>
+              {type === "range" && (
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={parseFloat(value)}
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  className="w-full"
+                />
+              )}
 
-        {/* Font Family */}
-        <label className="block mb-4">
-          <span className="block mb-1 font-semibold text-gray-700">Font Family</span>
-          <select
-            value={theme.fontFamily}
-            onChange={(e) => {
-              const val = e.target.value;
-              setTheme({ ...theme, fontFamily: val });
-              setPreviewTheme({ ...previewTheme, fontFamily: val });
-            }}
-            className="w-full p-2 border rounded"
-          >
-            <option value="Inter">Inter</option>
-            <option value="Poppins">Poppins</option>
-            <option value="Roboto">Roboto</option>
-            <option value="Montserrat">Montserrat</option>
-          </select>
-        </label>
+              {type === "select" && (
+                <select
+                  value={value}
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  className="w-full p-2 border rounded"
+                >
+                  {selectOptions[key]?.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              )}
 
-        {/* Font Sizes */}
-        <label className="block mb-4">
-          <span className="block mb-1 font-semibold text-gray-700">Heading Font Size</span>
-          <input
-            type="number"
-            value={parseInt(theme.fontSizeHeading)}
-            onChange={(e) => {
-              const val = `${e.target.value}px`;
-              setTheme({ ...theme, fontSizeHeading: val });
-              setPreviewTheme({ ...previewTheme, fontSizeHeading: val });
-            }}
-            className="w-full p-2 border rounded"
-          />
-        </label>
+              {type === "text" && (
+                <input
+                  type="text"
+                  value={value}
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  className="w-full p-2 border rounded"
+                />
+              )}
+            </label>
+          );
+        })}
 
-        <label className="block mb-4">
-          <span className="block mb-1 font-semibold text-gray-700">Description Font Size</span>
-          <input
-            type="number"
-            value={parseInt(theme.fontSizeDescription)}
-            onChange={(e) => {
-              const val = `${e.target.value}px`;
-              setTheme({ ...theme, fontSizeDescription: val });
-              setPreviewTheme({ ...previewTheme, fontSizeDescription: val });
-            }}
-            className="w-full p-2 border rounded"
-          />
-        </label>
-
-        <label className="block mb-4">
-          <span className="block mb-1 font-semibold text-gray-700">Button Font Size</span>
-          <input
-            type="number"
-            value={parseInt(theme.fontSizeButton)}
-            onChange={(e) => {
-              const val = `${e.target.value}px`;
-              setTheme({ ...theme, fontSizeButton: val });
-              setPreviewTheme({ ...previewTheme, fontSizeButton: val });
-            }}
-            className="w-full p-2 border rounded"
-          />
-        </label>
-
-        {/* Save Button */}
         <button
           onClick={saveTheme}
-          className={`w-full py-2 mt-3 rounded text-white transition ${
-            saving ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
-          }`}
           disabled={saving}
+          className={`w-full py-2 mt-3 rounded text-white transition ${saving ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
         >
           {saving ? "Saving..." : "Save Theme"}
         </button>
       </div>
 
-      {/* Right Preview */}
+      {/* Preview */}
       <div
         className="lg:w-2/3 p-5 flex items-center justify-center"
         style={{
           background: previewTheme.background,
           fontFamily: previewTheme.fontFamily,
+          padding: previewTheme.padding,
         }}
       >
         <div
-          className="w-full max-w-md rounded-xl shadow-xl p-6 text-center border"
+          className="w-full max-w-md text-center shadow-xl"
           style={{
             background: previewTheme.contentBackground,
-            color: previewTheme.fontColor, // 🔹 Apply font color globally
+            color: previewTheme.fontColor,
+            border: `${previewTheme.borderWidth} solid ${previewTheme.borderColor}`,
+            borderRadius: previewTheme.borderRadius,
+            margin: previewTheme.margin,
+            padding: previewTheme.padding,
+            boxShadow: previewTheme.boxShadow,
+            opacity: previewTheme.opacity,
+            fontWeight: previewTheme.fontWeight as any,
           }}
         >
-          <h1
-            className="font-bold mb-4"
-            style={{
-              color: previewTheme.fontColor,
-              fontSize: previewTheme.fontSizeHeading,
-            }}
-          >
+          <h1 className="font-bold mb-4" style={{ fontSize: previewTheme.fontSizeHeading }}>
             Premium Store
           </h1>
-          <p
-            className="mb-6"
-            style={{
-              color: previewTheme.fontColor,
-              fontSize: previewTheme.fontSizeDescription,
-            }}
-          >
+          <p className="mb-6" style={{ fontSize: previewTheme.fontSizeDescription }}>
             Customize your store design live!
           </p>
           <button
-            className="px-4 py-2 rounded"
+            className="px-4 py-2"
             style={{
               backgroundColor: previewTheme.primaryColor,
               color: previewTheme.fontColor,
               fontSize: previewTheme.fontSizeButton,
+              borderRadius: previewTheme.borderRadius,
+              border: `${previewTheme.borderWidth} solid ${previewTheme.borderColor}`,
+              boxShadow: previewTheme.boxShadow,
             }}
           >
             Sample Button

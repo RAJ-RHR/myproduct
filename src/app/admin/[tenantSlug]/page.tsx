@@ -22,6 +22,8 @@ export default function AdminDashboard() {
 
   const [uid, setUid] = useState<string | null>(null);
   const [tenantSlug, setTenantSlug] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState<string>("Company");
+  const [whatsappNumber, setWhatsappNumber] = useState<string>("");
   const [products, setProducts] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -30,6 +32,9 @@ export default function AdminDashboard() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
+  const [batchNumber, setBatchNumber] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [verified, setVerified] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [coverIndex, setCoverIndex] = useState(0);
   const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
@@ -51,6 +56,8 @@ export default function AdminDashboard() {
           if (tenantDoc.exists()) {
             const data = tenantDoc.data();
             setTenantSlug(data.tenantSlug);
+            setCompanyName(data.companyName || "Company");
+            setWhatsappNumber(data.whatsappNumber || "");
             await setDoc(doc(db, "slugs", data.tenantSlug), { uid: user.uid }, { merge: true });
           }
         } catch (err) {
@@ -104,11 +111,17 @@ export default function AdminDashboard() {
     setLoading(true);
 
     try {
+      // save WhatsApp in theme
+      await setDoc(doc(db, "tenants", uid, "settings", "theme"), { whatsappNumber }, { merge: true });
+
       const productData = {
         name,
         slug: slugify(name),
         price,
         description,
+        batchNumber,
+        expiryDate,
+        verified,
         images,
         customFields: customFields.filter((field) => field.key && field.value),
       };
@@ -134,6 +147,9 @@ export default function AdminDashboard() {
     setName(product.name);
     setPrice(product.price);
     setDescription(product.description);
+    setBatchNumber(product.batchNumber || "");
+    setExpiryDate(product.expiryDate || "");
+    setVerified(product.verified || false);
     setImages(product.images || []);
     setCoverIndex(0);
     setCustomFields(product.customFields || []);
@@ -160,6 +176,9 @@ export default function AdminDashboard() {
     setName("");
     setPrice("");
     setDescription("");
+    setBatchNumber("");
+    setExpiryDate("");
+    setVerified(false);
     setImages([]);
     setCoverIndex(0);
     setCustomFields([]);
@@ -177,13 +196,6 @@ export default function AdminDashboard() {
   const removeImage = (index: number) => {
     const updated = [...images];
     updated.splice(index, 1);
-    setImages(updated);
-  };
-
-  const reorderImages = (from: number, to: number) => {
-    const updated = [...images];
-    const [moved] = updated.splice(from, 1);
-    updated.splice(to, 0, moved);
     setImages(updated);
   };
 
@@ -215,10 +227,12 @@ export default function AdminDashboard() {
     <div className="p-4 sm:p-6 bg-gray-100 min-h-screen">
       {/* Header */}
       <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
-        <h1 className="text-2xl font-bold text-blue-600">Admin Dashboard</h1>
+        <h1 className="text-2xl font-bold text-blue-600">
+          Welcome {companyName}
+        </h1>
         <div className="flex gap-2">
           <button
-            onClick={() => router.push(`/admin/${tenantSlug}/manager`)}
+            onClick={() => router.push(`/admin/${tenantSlug}/manage`)}
             className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
           >
             Theme Manager
@@ -254,10 +268,36 @@ export default function AdminDashboard() {
             required
           />
         </div>
+        <input
+          value={batchNumber}
+          onChange={(e) => setBatchNumber(e.target.value)}
+          placeholder="Batch Number"
+          className="border p-2 rounded w-full"
+        />
+        <input
+          type="date"
+          value={expiryDate}
+          onChange={(e) => setExpiryDate(e.target.value)}
+          className="border p-2 rounded w-full"
+        />
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={verified}
+            onChange={(e) => setVerified(e.target.checked)}
+          />
+          Verified Product
+        </label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Description"
+          className="border p-2 rounded w-full"
+        />
+        <input
+          value={whatsappNumber}
+          onChange={(e) => setWhatsappNumber(e.target.value)}
+          placeholder="WhatsApp Number"
           className="border p-2 rounded w-full"
         />
         <input
