@@ -188,37 +188,45 @@ export default function ProductDetailPage() {
               <p style={{ fontSize: t.descSize }}>{product.description}</p>
             </div>
 
-            {/* Only Admin Added Fields */}
-            {product.customFields?.length > 0 && product.customFields.map((field: any, idx: number) => (
-              <div
-                key={idx}
-                className="mt-3 border-b"
-                style={{ borderColor: t.borderColor, background: t.expandBg, borderRadius: t.borderRadius }}
-              >
-                <button
-                  onClick={() => toggleSection(field.key)}
-                  className="w-full flex justify-between items-center py-2 font-semibold"
-                >
-                  <span>{field.key}</span>
-                  <span
-                    className="transition-transform duration-300"
-                    style={{ transform: openSection === field.key ? "rotate(180deg)" : "rotate(0deg)" }}
-                  >
-                    ▼
-                  </span>
-                </button>
+            {/* Admin Custom Fields */}
+            {product.customFields?.length > 0 &&
+              product.customFields.map((field: any, idx: number) => (
                 <div
-                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                    openSection === field.key ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-                  }`}
-                  style={{ fontSize: t.descSize }}
+                  key={idx}
+                  className="mt-3 border-b"
+                  style={{
+                    borderColor: t.borderColor,
+                    background: t.expandBg,
+                    borderRadius: t.borderRadius,
+                  }}
                 >
-                  <div className="pb-2 px-1">
-                    {field.value}
+                  <button
+                    onClick={() => toggleSection(field.key)}
+                    className="w-full flex justify-between items-center py-2 font-semibold"
+                  >
+                    <span>{field.key}</span>
+                    <span
+                      className="transition-transform duration-300"
+                      style={{ transform: openSection === field.key ? "rotate(180deg)" : "rotate(0deg)" }}
+                    >
+                      ▼
+                    </span>
+                  </button>
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                      openSection === field.key ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                    }`}
+                    style={{ fontSize: t.descSize }}
+                  >
+                    <div
+                      className="pb-2 px-1 whitespace-pre-line"
+                      // whitespace-pre-line makes \n show as line breaks
+                    >
+                      {field.value}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       </div>
